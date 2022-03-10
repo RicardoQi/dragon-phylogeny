@@ -1,0 +1,79 @@
+---
+title: "Dragon Phylogeny"
+author: "RicardoQi"
+date: '2022-03-09'
+output: html_document
+---
+![Retrieved from Sinon 02 from https://www.pinterest.ca/charmander06/toothless/](C:\\Users\\qi199\\Documents\\dragon-phylogeny\\images\\toothless.jpg){width=25%} ![Retrieved from Teenpublic from https://www.teepublic.com/fr/autocollant/2966373-mushu/](C:\\Users\\qi199\\Documents\\dragon-phylogeny\\images\\mushu.png){width=25%} ![Retrived from VOARTS from https://soundcloud.com/user-551901989-931097051/smaug](C:\\Users\\qi199\\Documents\\dragon-phylogeny\\images\\smaug.jpg){width=25%} \
+Retrieved from Sinon 02 from https://www.pinterest.ca/charmander06/toothless/ \
+Retrieved from Teenpublic from https://www.teepublic.com/fr/autocollant/2966373-mushu/ \
+Retrived from VOARTS from https://soundcloud.com/user-551901989-931097051/smaug \
+\
+\
+First, the .nex file is loaded
+```{r}
+library(ape)
+DragonNexus<-read.nexus.data("C:\\Users\\qi199\\Documents\\dragon-phylogeny\\input\\DragonMatrix.nex")
+```
+Based on the trait coding table, distinct binary codes are created for each of the three dragons.
+```{r}
+toothless <- "100100111111000000000001001100011110000110000110000110000110011100000100011100"
+mushu <- "100100001111000100100110101100110000000001101100001110000000111100010101100001"
+smaug <- "100111110011000110000010010000110001001000001010001000100001111000001011111001"
+```
+Then, the nexus list is converted to data.frame object.
+```{r}
+DragonNexusDF<-data.frame(matrix(unlist(DragonNexus), ncol=78,byrow=T))
+row.names(DragonNexusDF)<-names(DragonNexus)
+DragonDist<-dist(DragonNexusDF,method='binary')
+DragonDistMat<-as.matrix(DragonDist)
+```
+The Weight is imported and to help rationalize the tree.
+```{r}
+WeightsDat<-read.csv("C:\\Users\\qi199\\Documents\\dragon-phylogeny\\input\\Weights.csv")
+Weights<-paste0(WeightsDat$Weight,collapse="")
+Weights<-strsplit(Weights,split="")[[1]]
+WeightsNum<-rep(NA,length(Weights))
+for(i in 1:length(WeightsNum)){
+  if(Weights[i] %in% LETTERS){
+    WeightsNum[i]<-which(LETTERS==Weights[i])+9
+  } else {
+    WeightsNum[i]<-Weights[i]
+  }
+}
+WeightsNum<-as.numeric(WeightsNum)
+```
+The weight values are multiplied by the traits vectors of each dragon.
+```{r}
+WtDragonNexus<-DragonNexus
+for (i in 1:length(DragonNexus)){
+  RepWeight<-DragonNexus[[i]]==1
+  WtDragonNexus[[i]][RepWeight]<-WeightsNum[RepWeight]
+  RepWeight<-NA
+}
+```
+The distance matrix is calculated.
+```{r}
+library(reshape2)
+library(ggplot2)
+WtDragonNexusDF<-data.frame(matrix(unlist(WtDragonNexus),ncol=78,byrow=T))
+row.names(WtDragonNexusDF)<-names(WtDragonNexus)
+WtDragonDist<-dist(WtDragonNexusDF,method='euclidean')
+WtDragonDistMat<-as.matrix(WtDragonDist)
+WtPDat<-melt(WtDragonDistMat)
+ggplot(data = WtPDat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile()+scale_fill_gradientn(colours=c("white","blue","green","red")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+The final phylogenic tree is obtained, which help illustrate the relationship between 3 chosen dragon and positions within the population. 
+```{r}
+library(ggtree)
+WtDragonTree<-fastme.bal(WtDragonDist)
+WtDragonTreeNJ<-nj(WtDragonDist)
+ggtree(WtDragonTree,layout="circular")
+
+Country<-gsub("[0-9\\.]+([^X]+)X*","\\1",WtDragonTree$tip.label)
+CountryGroups<-split(WtDragonTree$tip.label, Country)
+WtDTcol<-groupOTU(WtDragonTree,CountryGroups)
+ggtree(WtDTcol,layout="circular",aes(colour=group))+geom_tiplab(size=2,aes(angle=angle))
+```
